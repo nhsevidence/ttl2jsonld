@@ -32,10 +32,34 @@ module.exports = function( grunt ) {
 
     grunt.log.write( "Retrieving a list of resources...");
 
-    var query = listOfTypeQuery( options );
-    queryStore( stardog, options.db, query )
-      .then(function( result ) {
-        console.log( result );
+    queryStore( stardog, options.db, listOfTypeQuery( options ) )
+      .then(function( results ) {
+        var resources = [];
+
+        return new Promise(function( resolve, reject ) {
+          process();
+
+          function process() {
+            if ( results.bindings.length <= 0 ) {
+              resolve( resources );
+              return;
+            }
+
+            var result = results.bindings.pop();
+
+            queryStore( stardog, options, subgraphQuery( result.s.value, options ) )
+              .then(function( resource ) {
+                resources.push( resource );
+
+                process();
+              });
+          }
+        });
+      })
+      .then(function( resources ) {
+        resources.forEach(function( resource ) {
+          console.dir( JSON.stringify( resource ) );
+        });
 
         grunt.log.writeln( "OK");
 
@@ -53,7 +77,7 @@ module.exports = function( grunt ) {
     grunt.verbose.ok( query );
 
     return new Promise(function( resolve, reject ) {
-      stardog.query({
+      stardog[ query.queryType === 'CONSTRUCT' ? 'queryGraph' : 'query' ]({
           database: db,
           query: query
         },
@@ -76,7 +100,6 @@ module.exports = function( grunt ) {
   }
 
   function listOfTypeQuery( options ) {
-    var sparqlGenerator = new SparqlGenerator();
     var query = {
       type: "query",
       prefixes: {},
@@ -96,12 +119,44 @@ module.exports = function( grunt ) {
       ]
     };
 
+    return prefixQuery( query );
+  }
+
+  function subgraphQuery( id, options ) {
+    var entity = new IRI( id ).toIRIString();
+
+    var query = {
+      type: "query",
+      queryType: "CONSTRUCT",
+      template: {
+        'subject': entity,
+        'predicate': "?p",
+        'object': '?o'
+      },
+      where: [
+        {
+          "type": "bgp",
+          "triples": [
+            {
+              'subject': entity,
+              'predicate': "?p",
+              'object': '?o'
+            }
+          ]
+        }
+      ]
+    };
+
+    return prefixQuery( query );
+  }
+
+  function prefixQuery( query, options ) {
     var prefixes = query.prefixes = query.prefixes || {};
     for ( var p in options.prefixes || {} ) {
       if ( !prefixes[ p ] ) prefixes[ p ] = pfx[ p ];
     }
 
-    return sparkqlGenerator.stringify( query );
+    return new SparqlGenerator().stringify( query );
   }
 
   function loadFrames( cwd ) {
