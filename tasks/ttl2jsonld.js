@@ -1,6 +1,6 @@
 var path = require('path');
 var mkdirp = require('mkdirp');
-var stardog = require('stardog');
+var Stardog = require('stardog');
 var sparql = require('sparqljs');
 var SparqlGenerator = sparql.Generator;
 
