@@ -3,6 +3,7 @@ var mkdirp = require('mkdirp');
 var Stardog = require('stardog');
 var sparql = require('sparqljs');
 var SparqlGenerator = sparql.Generator;
+var IRI = require('iri').IRI;
 
 var defaults = {
   type: 'http://ld.nice.org.uk/ns/bnf/drug',
@@ -29,12 +30,12 @@ module.exports = function( grunt ) {
         stardog.setEndpoint( options.server );
         stardog.setCredentials( options.username, options.password );
 
-
     grunt.log.write( "Retrieving a list of resources...");
-
     queryStore( stardog, options.db, listOfTypeQuery( options ) )
       .then(function( results ) {
         var resources = [];
+
+        console.log( results );
 
         return new Promise(function( resolve, reject ) {
           process();
@@ -47,7 +48,7 @@ module.exports = function( grunt ) {
 
             var result = results.bindings.pop();
 
-            queryStore( stardog, options, subgraphQuery( result.s.value, options ) )
+            queryStore( stardog, options.db, 'queryGraph', subgraphQuery( result.s.value, options ) )
               .then(function( resource ) {
                 resources.push( resource );
 
@@ -73,11 +74,16 @@ module.exports = function( grunt ) {
 
   // helpers
 
-  function queryStore( stardog, db, query ) {
+  function queryStore( stardog, db, qType, query ) {
+    if (!query) {
+      query = qType;
+      qType = 'query';
+    }
+
     grunt.verbose.ok( query );
 
     return new Promise(function( resolve, reject ) {
-      stardog[ query.queryType === 'CONSTRUCT' ? 'queryGraph' : 'query' ]({
+      stardog[ qType ]({
           database: db,
           query: query
         },
@@ -109,8 +115,8 @@ module.exports = function( grunt ) {
           "type": "bgp",
           "triples": [
             {
-              "subject": "?s",
-              "predicate": "a",
+              "subject": '?s',
+              "predicate": 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type',
               "object": options.type
             }
           ]
@@ -118,7 +124,7 @@ module.exports = function( grunt ) {
       ]
     };
 
-    return prefixQuery( query );
+    return prefixQuery( query, options );
   }
 
   function subgraphQuery( id, options ) {
@@ -146,7 +152,7 @@ module.exports = function( grunt ) {
       ]
     };
 
-    return prefixQuery( query );
+    return prefixQuery( query, options );
   }
 
   function prefixQuery( query, options ) {
