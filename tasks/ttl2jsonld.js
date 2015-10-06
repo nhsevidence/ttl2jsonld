@@ -76,7 +76,7 @@ module.exports = function( grunt ) {
   }
 
   function listOfTypeQuery( options ) {
-    var generator = new SparqlGenerator();
+    var sparqlGenerator = new SparqlGenerator();
     var query = {
       type: "query",
       prefixes: {},
@@ -101,7 +101,7 @@ module.exports = function( grunt ) {
       if ( !prefixes[ p ] ) prefixes[ p ] = pfx[ p ];
     }
 
-    return generator.stringify( query );
+    return sparkqlGenerator.stringify( query );
   }
 
   function loadFrames( cwd ) {
