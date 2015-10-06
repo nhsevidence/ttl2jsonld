@@ -102,7 +102,6 @@ module.exports = function( grunt ) {
   function listOfTypeQuery( options ) {
     var query = {
       type: "query",
-      prefixes: {},
       queryType: "SELECT",
       variables: [ "?s" ],
       where: [
@@ -151,7 +150,7 @@ module.exports = function( grunt ) {
   }
 
   function prefixQuery( query, options ) {
-    var prefixes = query.prefixes = query.prefixes || {};
+    var prefixes = query.prefixes || {};
     for ( var p in options.prefixes || {} ) {
       if ( !prefixes[ p ] ) prefixes[ p ] = pfx[ p ];
     }
