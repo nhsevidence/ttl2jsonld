@@ -8,6 +8,8 @@ var IRI = require('iri').IRI;
 var defaults = {
   type: 'http://ld.nice.org.uk/ns/bnf/drug',
 
+  dest: 'artifacts/jsonld/',
+
   // stardog
   server:   "http://192.168.99.100:5820", // Stardog server http endpoint
   db:       "nice",                       // Stardog database
@@ -32,41 +34,63 @@ module.exports = function( grunt ) {
 
     grunt.log.write( "Retrieving a list of resources...");
     queryStore( stardog, options.db, listOfTypeQuery( options ) )
-      .then(function( results ) {
-        var resources = [];
-
-        console.log( results );
-
-        return new Promise(function( resolve, reject ) {
-          process();
-
-          function process() {
-            if ( results.bindings.length <= 0 ) {
-              resolve( resources );
-              return;
-            }
-
-            var result = results.bindings.pop();
-
-            queryStore( stardog, options.db, 'queryGraph', subgraphQuery( result.s.value, options ) )
-              .then(function( resource ) {
-                resources.push( resource );
-
-                process();
-              });
-          }
-        });
-      })
+      .then( processResources )
+      .then( storeResources )
       .then(function( resources ) {
-        resources.forEach(function( resource ) {
-          console.dir( JSON.stringify( resource ) );
-        });
-
-        grunt.log.writeln( "OK");
-
         done();
       })
       .catch( grunt.fail.fatal );
+
+
+
+
+
+    function processResources( results ) {
+      var resources = [];
+      return new Promise(function( resolve, reject ) {
+        grunt.log.write( "Retrieving resource graphs...");
+        process();
+
+        function process() {
+          if ( results.bindings.length <= 0 ) {
+            resolve( resources );
+            return;
+          }
+
+          var result = results.bindings.pop();
+
+          queryStore( stardog, options.db, 'queryGraph', subgraphQuery( result.s.value, options ) )
+            .then(function( resource ) {
+              resources.push( resource );
+
+              process();
+            });
+        }
+      });
+    }
+
+    function storeResources( resources ) {
+      return new Promise(function( resolve, reject ) {
+        process();
+
+        function process() {
+          if ( resources.length <= 0 ) {
+            resolve( resources );
+            return;
+          }
+
+          var graph = resources.pop()[0];
+
+          var id = graph[ '@id' ];
+          var filename = path.join( options.dest, path.basename( id ).replace( path.extname( id ), '.jsonld' ) );
+
+          mkdirp.sync( path.dirname( filename ) );
+          grunt.file.write( filename, JSON.stringify( graph, null, '\t' ) );
+
+          process();
+        }
+      });
+    }
   });
 
 
