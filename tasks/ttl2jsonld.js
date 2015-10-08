@@ -158,8 +158,11 @@ module.exports = function( grunt ) {
           var triple = response.bindings.pop();
 
           subgraphQuery( grunt, triple.s.value, options )
-            .then(function( graph ) {
-              graphs.push( graph[0] );
+            .then(function( r ) {
+              grunt.log.debug( r );
+              grunt.log.debug( "" );
+
+              graphs.push( r );
 
               process();
             });
@@ -182,9 +185,17 @@ module.exports = function( grunt ) {
         if ( !context[ p ] ) context[ p ] = options.prefixes[ p ];
       }
 
-      return RSVP.all( graphs.map(function( graph ) { return LDParser.frame( graph, frame ); }) );
+      var promises = graphs.map(function( g ) {
+        return LDParser.compact( g, context )
+          .then(function( c ) {
+            return LDParser.frame( c, frame );
+          });
+      });
+
+      return RSVP.all( promises );
     };
   }
+
 
   function storeGraphs( g, o ) {
     var grunt = g;
@@ -205,14 +216,11 @@ module.exports = function( grunt ) {
           var graph = resource[ '@graph' ][ 0 ];
 
           var iri = new IRI( graph[ '@id' ] );
-
           var id = iri.fragment();
               id = path.basename( id ? id.replace( '#', '' ) : iri.toIRIString() );
+
           var ext = path.extname( id );
           var file = ext ? id.replace( ext, '.jsonld' ) : id + '.jsonld';
-
-          console.log( '>>>', id, '-->', file );
-
           var filename = path.join( options.dest, file );
 
           mkdirp.sync( path.dirname( filename ) );
