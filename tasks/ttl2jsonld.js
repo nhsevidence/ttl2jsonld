@@ -188,7 +188,16 @@ module.exports = function( grunt ) {
       var promises = graphs.map(function( g ) {
         return LDParser.compact( g, context )
           .then(function( c ) {
+            grunt.log.debug( c );
+            grunt.log.debug( "" );
+
             return LDParser.frame( c, frame );
+          })
+          .then(function( f ) {
+            grunt.log.debug( f );
+            grunt.log.debug( "" );
+
+            return f;
           });
       });
 
@@ -224,7 +233,7 @@ module.exports = function( grunt ) {
           var filename = path.join( options.dest, file );
 
           mkdirp.sync( path.dirname( filename ) );
-          grunt.file.write( filename, JSON.stringify( graph, null, '\t' ) );
+          grunt.file.write( filename, JSON.stringify( resource, null, '\t' ) );
 
           process();
         }
