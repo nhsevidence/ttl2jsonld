@@ -10,17 +10,17 @@ var RSVP = require('rsvp');
 var Promise = RSVP.Promise;
 
 var defaults = {
-  type: 'http://ld.nice.org.uk/ns/bnf/drug',
-
-  dest: 'artifacts/jsonld/',
-
   // stardog
-  server:   "http://192.168.99.100:5820", // Stardog server http endpoint
+  server:   "http://stardog:5820", // Stardog server http endpoint
   db:       "nice",                       // Stardog database
   username: "admin",
   password: "admin",
 
-  prefixes: {}
+  prefixes: {},
+
+  type: 'http://ld.nice.org.uk/ns/bnf#Drug',
+  dest: 'artifacts/www/'
+
 };
 
 module.exports = function( grunt ) {
@@ -204,8 +204,16 @@ module.exports = function( grunt ) {
           var resource = resources.pop();
           var graph = resource[ '@graph' ][ 0 ];
 
-          var id = graph[ '@id' ];
-          var filename = path.join( options.dest, path.basename( id ).replace( path.extname( id ), '.jsonld' ) );
+          var iri = new IRI( graph[ '@id' ] );
+
+          var id = iri.fragment();
+              id = path.basename( id ? id.replace( '#', '' ) : iri.toIRIString() );
+          var ext = path.extname( id );
+          var file = ext ? id.replace( ext, '.jsonld' ) : id + '.jsonld';
+
+          console.log( '>>>', id, '-->', file );
+
+          var filename = path.join( options.dest, file );
 
           mkdirp.sync( path.dirname( filename ) );
           grunt.file.write( filename, JSON.stringify( graph, null, '\t' ) );
