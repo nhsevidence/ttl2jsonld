@@ -69,6 +69,11 @@ module.exports = function( grunt ) {
             { 'subject': '?entity', 'predicate': 'http://ld.nice.org.uk/ns/bnf/name', 'object': '?name' }
           ]
         }
+      ],
+      order: [
+        {
+          "expression": "?name"
+        }
       ]
     };
 
