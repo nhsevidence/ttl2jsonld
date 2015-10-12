@@ -18,8 +18,9 @@ var defaults = {
 
   prefixes: {},
 
-  type: 'http://ld.nice.org.uk/ns/bnf#Drug',
-  dest: 'artifacts/www/'
+  type:       'http://ld.nice.org.uk/ns/bnf#Drug',
+  labeledBy:  'http://www.w3.org/2000/01/rdf-schema#label',
+  dest:       'artifacts/www/'
 
 };
 
@@ -59,14 +60,14 @@ module.exports = function( grunt ) {
       queryType: "CONSTRUCT",
       template: [
         { 'subject': '?entity', 'predicate': 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type', 'object': entityType },
-        { 'subject': '?entity', 'predicate': 'http://ld.nice.org.uk/ns/bnf/name', 'object': '?name' }
+        { 'subject': '?entity', 'predicate': options.labeledBy, 'object': '?name' }
       ],
       where: [
         {
           "type": "bgp",
           "triples": [
             { 'subject': '?entity', 'predicate': 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type', 'object': entityType },
-            { 'subject': '?entity', 'predicate': 'http://ld.nice.org.uk/ns/bnf/name', 'object': '?name' }
+            { 'subject': '?entity', 'predicate': options.labeledBy, 'object': '?name' }
           ]
         }
       ],
