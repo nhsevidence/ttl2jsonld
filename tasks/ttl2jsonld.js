@@ -32,6 +32,8 @@ module.exports = function( grunt ) {
 
     grunt.log.writeln( "Retrieving a list of resources...");
     listOfTypeQuery( grunt, options.type, options )
+      .then( frameGraph( grunt, options ) )
+      .then( storeGraph( grunt, options ) )
       .then( retrieveGraphs( grunt, options ) )
       .then( frameGraphs( grunt, options ) )
       .then( storeGraphs( grunt, options ) )
@@ -54,19 +56,23 @@ module.exports = function( grunt ) {
 
     var query = {
       type: "query",
-      queryType: "SELECT",
-      variables: [ "?s" ],
+      queryType: "CONSTRUCT",
+      template: [
+        { 'subject': '?entity', 'predicate': 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type', 'object': entityType },
+        { 'subject': '?entity', 'predicate': 'http://ld.nice.org.uk/ns/bnf/name', 'object': '?name' }
+      ],
       where: [
         {
           "type": "bgp",
           "triples": [
-            { "subject": '?s', "predicate": 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type', "object": entityType }
+            { 'subject': '?entity', 'predicate': 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type', 'object': entityType },
+            { 'subject': '?entity', 'predicate': 'http://ld.nice.org.uk/ns/bnf/name', 'object': '?name' }
           ]
         }
       ]
     };
 
-    return queryStore( grunt, 'query', query, options );
+    return queryStore( grunt, 'queryGraph', query, options );
   }
 
   function subgraphQuery( grunt, id, options ) {
@@ -150,14 +156,16 @@ module.exports = function( grunt ) {
         process();
 
         function process() {
-          if ( response.bindings.length <= 0 ) {
+          if ( response['@graph'].length <= 0 ) {
             resolve( graphs );
             return;
           }
 
-          var triple = response.bindings.pop();
+          var graph = response['@graph'].pop();
 
-          subgraphQuery( grunt, triple.s.value, options )
+          console.dir( graph );
+
+          subgraphQuery( grunt, graph['@id'], options )
             .then(function( r ) {
               grunt.log.debug( r );
               grunt.log.debug( "" );
@@ -205,10 +213,40 @@ module.exports = function( grunt ) {
     };
   }
 
+  function frameGraph( g, o ) {
+    var grunt = g;
+    var options = o;
+
+    return function( graph ) {
+
+      var frame = { '@type': options.type };
+
+      var context = frame['@context'] = {};
+      for ( var p in options.prefixes || {} ) {
+        if ( !context[ p ] ) context[ p ] = options.prefixes[ p ];
+      }
+
+      return LDParser.compact( graph, context )
+        .then(function( c ) {
+          grunt.log.debug( c );
+          grunt.log.debug( "" );
+
+          return LDParser.frame( c, frame );
+        })
+        .then(function( f ) {
+          grunt.log.debug( f );
+          grunt.log.debug( "" );
+
+          return f;
+        });
+    };
+  }
+
 
   function storeGraphs( g, o ) {
     var grunt = g;
     var options = o;
+    var store = storeGraph( g, o );
 
     return function( resources ) {
       return new Promise(function( resolve, reject ) {
@@ -221,23 +259,36 @@ module.exports = function( grunt ) {
             return;
           }
 
-          var resource = resources.pop();
-          var graph = resource[ '@graph' ][ 0 ];
-
-          var iri = new IRI( graph[ '@id' ] );
-          var id = iri.fragment();
-              id = path.basename( id ? id.replace( '#', '' ) : iri.toIRIString() );
-
-          var ext = path.extname( id );
-          var file = ext ? id.replace( ext, '.jsonld' ) : id + '.jsonld';
-          var filename = path.join( options.dest, file );
-
-          mkdirp.sync( path.dirname( filename ) );
-          grunt.file.write( filename, JSON.stringify( resource, null, '\t' ) );
+          store( resources.pop() );
 
           process();
         }
       });
+    };
+  }
+
+
+  function storeGraph( g, o ) {
+    var grunt = g;
+    var options = o;
+
+    return function( resource ) {
+      console.dir( resource );
+
+      var graph = resource[ '@graph' ][ 0 ];
+
+      var iri = new IRI( resource[ '@graph' ].length == 1 ? graph[ '@id' ] : 'index' );
+      var id = iri.fragment();
+          id = path.basename( id ? id.replace( '#', '' ) : iri.toIRIString() );
+
+      var ext = path.extname( id );
+      var file = ext ? id.replace( ext, '.jsonld' ) : id + '.jsonld';
+      var filename = path.join( options.dest, file ).toLowerCase();
+
+      mkdirp.sync( path.dirname( filename ) );
+      grunt.file.write( filename, JSON.stringify( resource, null, '\t' ) );
+
+      return resource;
     };
   }
 
