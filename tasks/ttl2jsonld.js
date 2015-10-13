@@ -20,7 +20,7 @@ var defaults = {
 
   type:       'http://ld.nice.org.uk/ns/bnf#Drug',
   labeledBy:  'http://www.w3.org/2000/01/rdf-schema#label',
-  dest:       'artifacts/www/'
+  dest:       'artifacts/jsonld/'
 
 };
 
@@ -31,7 +31,6 @@ module.exports = function( grunt ) {
 
     var options = this.options( defaults );
 
-    grunt.log.writeln( "Retrieving a list of resources...");
     listOfTypeQuery( grunt, options.type, options )
       .then( frameGraph( grunt, options ) )
       .then( storeGraph( grunt, options ) )
@@ -39,8 +38,6 @@ module.exports = function( grunt ) {
       .then( frameGraphs( grunt, options ) )
       .then( storeGraphs( grunt, options ) )
       .then(function( resources ) {
-        grunt.log.ok( "OK" );
-
         done();
       })
       .catch( grunt.fail.fatal );
@@ -158,7 +155,6 @@ module.exports = function( grunt ) {
       var graphs = [];
 
       return new Promise(function( resolve, reject ) {
-        grunt.log.writeln( "Retrieving resource graphs...");
         process();
 
         function process() {
@@ -169,13 +165,8 @@ module.exports = function( grunt ) {
 
           var graph = response['@graph'].pop();
 
-          console.dir( graph );
-
           subgraphQuery( grunt, graph['@id'], options )
             .then(function( r ) {
-              grunt.log.debug( r );
-              grunt.log.debug( "" );
-
               graphs.push( r );
 
               process();
@@ -188,62 +179,26 @@ module.exports = function( grunt ) {
   function frameGraphs( g, o ) {
     var grunt = g;
     var options = o;
+    var framer = frameGraph( g, o );
 
     return function( graphs ) {
-      grunt.log.writeln( "Framing Graphs...");
-
-      var frame = { '@type': options.type };
-
-      var context = frame['@context'] = {};
-      for ( var p in options.prefixes || {} ) {
-        if ( !context[ p ] ) context[ p ] = options.prefixes[ p ];
-      }
-
-      var promises = graphs.map(function( g ) {
-        return LDParser.compact( g, context )
-          .then(function( c ) {
-            grunt.log.debug( c );
-            grunt.log.debug( "" );
-
-            return LDParser.frame( c, frame );
-          })
-          .then(function( f ) {
-            grunt.log.debug( f );
-            grunt.log.debug( "" );
-
-            return f;
-          });
-      });
-
-      return RSVP.all( promises );
+      return RSVP.all( graphs.map( framer ) );
     };
   }
 
   function frameGraph( g, o ) {
     var grunt = g;
     var options = o;
+    var frame = { '@type': options.type };
+    var context = frame['@context'] = {};
+    for ( var p in options.prefixes || {} ) {
+      if ( !context[ p ] ) context[ p ] = options.prefixes[ p ];
+    }
 
     return function( graph ) {
-
-      var frame = { '@type': options.type };
-
-      var context = frame['@context'] = {};
-      for ( var p in options.prefixes || {} ) {
-        if ( !context[ p ] ) context[ p ] = options.prefixes[ p ];
-      }
-
       return LDParser.compact( graph, context )
         .then(function( c ) {
-          grunt.log.debug( c );
-          grunt.log.debug( "" );
-
           return LDParser.frame( c, frame );
-        })
-        .then(function( f ) {
-          grunt.log.debug( f );
-          grunt.log.debug( "" );
-
-          return f;
         });
     };
   }
@@ -256,7 +211,6 @@ module.exports = function( grunt ) {
 
     return function( resources ) {
       return new Promise(function( resolve, reject ) {
-        grunt.log.writeln( "Storing JSON-LD...");
         process();
 
         function process() {
@@ -279,8 +233,6 @@ module.exports = function( grunt ) {
     var options = o;
 
     return function( resource ) {
-      console.dir( resource );
-
       var graph = resource[ '@graph' ][ 0 ];
 
       var iri = new IRI( resource[ '@graph' ].length == 1 ? graph[ '@id' ] : 'index' );
