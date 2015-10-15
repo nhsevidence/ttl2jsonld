@@ -3,6 +3,7 @@ var mkdirp = require('mkdirp');
 var Stardog = require('stardog');
 var sparql = require('sparqljs');
 var SparqlGenerator = sparql.Generator;
+var SparqlParser = sparql.Parser;
 var IRI = require('iri').IRI;
 var jsonld = require('jsonld');
 var LDParser = jsonld.promises;
@@ -81,23 +82,30 @@ module.exports = function( grunt ) {
   function subgraphQuery( grunt, id, options ) {
     var entityId = new IRI( id ).toIRIString();
 
-    var query = {
-      type: "query",
-      queryType: "CONSTRUCT",
-      template: [
-        { 'subject': entityId, 'predicate': "?p", 'object': '?o' }
-      ],
-      where: [
-        {
-          "type": "bgp",
-          "triples": [
-            { 'subject': entityId, 'predicate': "?p", 'object': '?o' }
-          ]
-        }
-      ]
-    };
+    var query = '\
+CONSTRUCT {\
+	?s ?p ?o .\
+}\
+WHERE {\
+  {\
+  	?s ?p ?o .\
+    FILTER( ?s IN ( @entity )) .\
+  }\
+  UNION\
+  {\
+    @entity ?x ?s .\
+    ?s ?p ?o .                              	\
+  }\
+  UNION\
+  {\
+  	@entity ?x ?y .\
+    ?y ?z ?s .\
+    ?s ?p ?o .\
+  }\
+}\
+'.replace( /@entity/gmi, '<'+ entityId +'>' );
 
-    return queryStore( grunt, 'queryGraph', query, options );
+    return queryStore( grunt, 'queryGraph', new SparqlParser().parse( query ), options );
   }
 
   function queryStore( g, qType, query, o ) {
