@@ -1,261 +1,28 @@
-var path = require('path');
-var mkdirp = require('mkdirp');
-var Stardog = require('stardog');
-var sparql = require('sparqljs');
-var SparqlGenerator = sparql.Generator;
-var SparqlParser = sparql.Parser;
-var IRI = require('iri').IRI;
-var jsonld = require('jsonld');
-var LDParser = jsonld.promises;
-var RSVP = require('rsvp');
-var Promise = RSVP.Promise;
+/*
+ * TTL 2 JSON-LD
+ * http://about.me/mattonfoot
+ *
+ * Copyright (c) 2015 Matt Smith, contributors
+ * Licensed under the MIT license.
+ */
 
-var defaults = {
-  // stardog
-  server:   "http://stardog:5820", // Stardog server http endpoint
-  db:       "nice",                       // Stardog database
-  username: "admin",
-  password: "admin",
-
-  prefixes: {},
-
-  type:       'http://ld.nice.org.uk/ns/bnf#Drug',
-  labeledBy:  'http://www.w3.org/2000/01/rdf-schema#label',
-  dest:       'artifacts/jsonld/'
-
-};
+'use strict';
 
 module.exports = function( grunt ) {
+  var ttl2jsonld = require( './lib/ttl2jsonld' )( grunt );
 
-  grunt.registerMultiTask( 'ttl2jsonld', 'Extracts JSON-LD from a triple store', function() {
-    var done = this.async();
-
-    var options = this.options( defaults );
-
-    listOfTypeQuery( grunt, options.type, options )
-      .then( frameGraph( grunt, options ) )
-      .then( storeGraph( grunt, options ) )
-      .then( retrieveGraphs( grunt, options ) )
-      .then( frameGraphs( grunt, options ) )
-      .then( storeGraphs( grunt, options ) )
-      .then(function( resources ) {
-        done();
-      })
-      .catch( grunt.fail.fatal );
-  });
-
-
-
-
-  // helpers
-
-
-  function listOfTypeQuery( grunt, type, options ) {
-    var entityType = new IRI( type ).toIRIString();
-
-    var query = {
-      type: "query",
-      queryType: "CONSTRUCT",
-      template: [
-        { 'subject': '?entity', 'predicate': 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type', 'object': entityType },
-        { 'subject': '?entity', 'predicate': options.labeledBy, 'object': '?name' }
-      ],
-      where: [
-        {
-          "type": "bgp",
-          "triples": [
-            { 'subject': '?entity', 'predicate': 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type', 'object': entityType },
-            { 'subject': '?entity', 'predicate': options.labeledBy, 'object': '?name' }
-          ]
-        }
-      ],
-      order: [
-        {
-          "expression": "?name"
-        }
-      ]
-    };
-
-    return queryStore( grunt, 'queryGraph', query, options );
-  }
-
-  function subgraphQuery( grunt, id, options ) {
-    var entityId = new IRI( id ).toIRIString();
-
-    var query = '\
-CONSTRUCT {\
-	?s ?p ?o .\
-}\
-WHERE {\
-  {\
-  	?s ?p ?o .\
-    FILTER( ?s IN ( @entity )) .\
-  }\
-  UNION\
-  {\
-    @entity ?x ?s .\
-    ?s ?p ?o .                              	\
-  }\
-  UNION\
-  {\
-  	@entity ?x ?y .\
-    ?y ?z ?s .\
-    ?s ?p ?o .\
-  }\
-}\
-'.replace( /@entity/gmi, '<'+ entityId +'>' );
-
-    return queryStore( grunt, 'queryGraph', new SparqlParser().parse( query ), options );
-  }
-
-  function queryStore( g, qType, query, o ) {
-    var grunt = g;
-
-    var options = o;
-        if ( options.port ) options.port = options.port * 1;
-        if ( options.port === 443 ) options.secure = true;
-
-    var stardog = new Stardog.Connection();
-        stardog.setEndpoint( options.server );
-        stardog.setCredentials( options.username, options.password );
-
-    var sparql = prefixQuery( query, options );
-
-    grunt.verbose.ok( sparql );
-
-    return new Promise(function( resolve, reject ) {
-      stardog[ qType ]({
-          database: options.db,
-          query: sparql
-        },
-        onComplete );
-
-      function onComplete( data, response ) {
-        if ( response.statusCode < 200 || response.statusCode > 299 ) {
-          var err = new Error( response.statusMessage + ' [ ' + sparql + ' ]' );
-          err.statusCode = response.statusCode;
-          err.response = response;
-
-          grunt.fail.fatal( err );
-
-          return reject( err );
-        }
-
-        resolve( data.results || data );
-      }
+  grunt.registerMultiTask('ttl2jsonld', 'Store JSON-LD framed graph output from SPARQL queries.', function() {
+    ttl2jsonld.options = this.options({
+      lang: 'en'
     });
-  }
 
-  function prefixQuery( query, options ) {
-    var prefixes = query.prefixes = {};
-    for ( var p in options.prefixes || {} ) {
-      if ( !prefixes[ p ] ) prefixes[ p ] = options.prefixes[ p ];
+    // check options to ensure they are suitable
+/*
+    if (grunt.util._.include(['zip', 'tar', 'tgz', 'gzip', 'deflate', 'deflateRaw'], compress.options.mode) === false) {
+      grunt.fail.warn('Mode ' + String(compress.options.mode).cyan + ' not supported.');
     }
+*/
 
-    return new SparqlGenerator().stringify( query );
-  }
-
-  function retrieveGraphs( g, o ) {
-    var grunt = g;
-    var options = o;
-
-    return function( response ) {
-      var graphs = [];
-
-      return new Promise(function( resolve, reject ) {
-        process();
-
-        function process() {
-          if ( response['@graph'].length <= 0 ) {
-            resolve( graphs );
-            return;
-          }
-
-          var graph = response['@graph'].pop();
-
-          subgraphQuery( grunt, graph['@id'], options )
-            .then(function( r ) {
-              graphs.push( r );
-
-              process();
-            });
-        }
-      });
-    }
-  }
-
-  function frameGraphs( g, o ) {
-    var grunt = g;
-    var options = o;
-    var framer = frameGraph( g, o );
-
-    return function( graphs ) {
-      return RSVP.all( graphs.map( framer ) );
-    };
-  }
-
-  function frameGraph( g, o ) {
-    var grunt = g;
-    var options = o;
-    var frame = { '@type': options.type };
-    var context = frame['@context'] = {};
-    for ( var p in options.prefixes || {} ) {
-      if ( !context[ p ] ) context[ p ] = options.prefixes[ p ];
-    }
-
-    return function( graph ) {
-      return LDParser.compact( graph, context )
-        .then(function( c ) {
-          return LDParser.frame( c, frame );
-        });
-    };
-  }
-
-
-  function storeGraphs( g, o ) {
-    var grunt = g;
-    var options = o;
-    var store = storeGraph( g, o );
-
-    return function( resources ) {
-      return new Promise(function( resolve, reject ) {
-        process();
-
-        function process() {
-          if ( resources.length <= 0 ) {
-            resolve( resources );
-            return;
-          }
-
-          store( resources.pop() );
-
-          process();
-        }
-      });
-    };
-  }
-
-
-  function storeGraph( g, o ) {
-    var grunt = g;
-    var options = o;
-
-    return function( resource ) {
-      var graph = resource[ '@graph' ][ 0 ];
-
-      var iri = new IRI( resource[ '@graph' ].length == 1 ? graph[ '@id' ] : 'index' );
-      var id = iri.fragment();
-          id = path.basename( id ? id.replace( '#', '' ) : iri.toIRIString() );
-
-      var ext = path.extname( id );
-      var file = ext ? id.replace( ext, '.jsonld' ) : id + '.jsonld';
-      var filename = path.join( options.dest, file ).toLowerCase();
-
-      mkdirp.sync( path.dirname( filename ) );
-      grunt.file.write( filename, JSON.stringify( resource, null, '\t' ) );
-
-      return resource;
-    };
-  }
-
+    ttl2jsonld.query( this.async() );
+  });
 };
