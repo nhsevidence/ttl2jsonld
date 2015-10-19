@@ -114,7 +114,7 @@ module.exports = function( grunt ) {
     var isGraph = !graph.bindings;
 
     graph = graph.bindings || graph;
-    return LDParser.compact( graph, context, { compactArrays: false })
+    return LDParser.compact( graph, context )
       .then(function( graph ) {
 
         if ( !frame ) {
