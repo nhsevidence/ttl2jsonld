@@ -34,7 +34,7 @@ module.exports = function( grunt ) {
         stardog.setCredentials( exports.options.username, exports.options.password );
     var db      = exports.options.db;
 
-    process().then( exports.storeGraphs( exports.options.dest ) ).then(function() { done(); }).catch( grunt.fail.fatal );
+    process().then( exports.storeGraphs( exports.options.dest, exports.options.filename ) ).then(function() { done(); }).catch( grunt.fail.fatal );
 
     function process( datasets ) {
       var query = queries.shift();
@@ -117,12 +117,20 @@ module.exports = function( grunt ) {
     return LDParser.compact( graph, context, { compactArrays: false })
       .then(function( graph ) {
 
-        if ( !frame ) frame = { '@type': type || exports.getTypesFromGraph( graph ) || 'owl:Thing' };
+        if ( !frame ) {
+          frame = { '@type': type || exports.getTypesFromGraph( graph ) || 'owl:Thing' };
+          grunt.verbose.writeln( 'Using generated frame...' );
+          grunt.verbose.writeln( JSON.stringify( frame ) );
+        }
         frame[ '@context' ] = frame[ '@context' ] || context;
 
         if ( !isGraph ) return graph;
 
-        return LDParser.frame( graph, frame );
+        return LDParser.frame( graph, frame )
+              .catch(function( e ){
+                grunt.log.error( e );
+                grunt.fail.fatal( JSON.stringify( frame, null, ' ' ) );
+              });
       });
   };
 
@@ -150,9 +158,11 @@ module.exports = function( grunt ) {
     if ( graph['@graph'] ) {
       graph['@graph'].forEach(function( x ) {
         var type = x['@type'];
-        if ( typeof type === 'string' ) return types.push( type );
 
-        types = types.concat( type );
+        if ( !type ) return;
+        if ( typeof type === 'string' ) type = [ type ];
+
+        type.forEach(function( t ) { !~types.indexOf( t ) && types.push( t ); });
       });
     }
 
@@ -164,8 +174,8 @@ module.exports = function( grunt ) {
   };
 
   // returns a function that resolves a promise after writing an array of jsonld resources to disc
-  exports.storeGraphs = function( dest ) {
-    var store = exports.storeGraph( dest );
+  exports.storeGraphs = function( dest, filename ) {
+    var store = exports.storeGraph( dest, filename );
 
     return function( resources ) {
       return new Promise(function( resolve, reject ) {
@@ -175,24 +185,28 @@ module.exports = function( grunt ) {
   };
 
   // returns a function that writes jsonld to disc after processing the path as a template with the jsonld graph passed in
-  exports.storeGraph = function( dest ) {
+  exports.storeGraph = function( dest, f ) {
     if ( !dest ) {
       throw new Error( 'no destination folder supplied' );
     }
 
     return function( jsonld ) {
-      var graph = ( jsonld[ '@graph' ] && jsonld[ '@graph' ][ 0 ] ) || jsonld;
+      var filename = f;
+      if ( !filename ) {
+        var graph = ( jsonld[ '@graph' ] && jsonld[ '@graph' ][ 0 ] ) || jsonld;
 
-      var iri = new IRI( jsonld[ '@graph' ].length == 1 ? graph[ '@id' ] : 'index' );
-      var id = iri.fragment();
-          id = path.basename( id ? id.replace( '#', '' ) : iri.toIRIString() );
+        var iri = new IRI( jsonld[ '@graph' ].length == 1 ? graph[ '@id' ] : 'index' );
+        var id = iri.fragment();
+            id = path.basename( id ? id.replace( '#', '' ) : iri.toIRIString() );
 
-      var ext = path.extname( id );
-      var file = ( ext ? id.replace( ext, '' ) : id ) + '.jsonld';
-      var filename = path.join( dest, file ).toLowerCase();
+        var ext = path.extname( id );
+        filename = ( ext ? id.replace( ext, '' ) : id );
+      }
 
-      grunt.file.mkdir( path.dirname( filename ) );
-      grunt.file.write( filename, JSON.stringify( jsonld, null, '\t' ) );
+      var filepath = path.join( dest, filename + '.jsonld' ).toLowerCase();
+
+      grunt.file.mkdir( path.dirname( filepath ) );
+      grunt.file.write( filepath, JSON.stringify( jsonld, null, '\t' ) );
 
       return jsonld;
     };

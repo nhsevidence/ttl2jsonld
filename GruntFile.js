@@ -69,7 +69,7 @@ WHERE {\
           ],
 
           type:  'Drug',
-          dest:  'artifacts/jsonld/drug/'
+          dest:  'tmp/drug/'
         }
       }
     },
