@@ -32,6 +32,7 @@ module.exports = function( grunt ) {
     var stardog = new Stardog.Connection();
         stardog.setEndpoint( exports.options.server );
         stardog.setCredentials( exports.options.username, exports.options.password );
+        stardog.setReasoning( exports.options.reasoning || false );
     var db      = exports.options.db;
 
     process().then( exports.storeGraphs( exports.options.dest, exports.options.filename ) ).then(function() { done(); }).catch( grunt.fail.fatal );
