@@ -15,6 +15,7 @@ var path = require('path');
 var Stardog = require('stardog');
 var RSVP = require('rsvp');
 var Promise = RSVP.Promise;
+var util = require('util');
 
 module.exports = function( grunt ) {
 
@@ -46,21 +47,24 @@ module.exports = function( grunt ) {
             return resolve( [] );
           }
 
-          var graphs = [];
-          var flattened = { bindings: [] };
-          datasets.forEach(function( dataset ) {
-            if ( !dataset.bindings ) {
-              graphs.push( exports.frameGraph( dataset, context, frame, type ) );
-            }
+          exports.generateFrame( frame, context, datasets, type )
+            .then(function( frame ) {
+              var graphs = [];
+              var flattened = { bindings: [] };
+              datasets.forEach(function( dataset ) {
+                if ( !dataset.bindings ) {
+                  graphs.push( exports.frameGraph( dataset, context, frame ) );
+                }
 
-            flattened.bindings = flattened.bindings.concat( dataset.bindings );
-          });
+                flattened.bindings = flattened.bindings.concat( dataset.bindings );
+              });
 
-          if ( ~graphs.length ) {
-            return RSVP.all( graphs ).then( resolve, reject );
-          }
+              if ( ~graphs.length ) {
+                return RSVP.all( graphs ).then( resolve, reject );
+              }
 
-          resolve( flattened );
+              resolve( flattened );
+            });
         });
       }
 
@@ -89,7 +93,7 @@ module.exports = function( grunt ) {
     }
 
     return query;
-  }
+  };
 
   exports.queryStardog = function( stardog, db, query ) {
     var qType = ~query.trim().indexOf( 'CONSTRUCT' ) ? 'queryGraph' : 'query';
@@ -109,21 +113,15 @@ module.exports = function( grunt ) {
         resolve( data.results || data );
       }
     });
-  }
+  };
 
-  exports.frameGraph = function( graph, context, frame, type ) {
+  exports.frameGraph = function( graph, context, frame ) {
     var isGraph = !graph.bindings;
 
     graph = graph.bindings || graph;
-
-    if ( !frame ) {
-      frame = { '@type': type || exports.getTypeFromGraph( graph ) || 'owl:Thing' };
-      grunt.verbose.writeln( 'Using generated frame...' );
-      grunt.verbose.writeln( JSON.stringify( frame ) );
-    }
-    frame[ '@context' ] = frame[ '@context' ] || context;
-
     if ( !isGraph ) return graph;
+
+    graph = { '@graph': graph };
 
     return LDParser.frame( graph, frame )
           .catch(function( e ){
@@ -161,7 +159,7 @@ module.exports = function( grunt ) {
         if ( !type ) return;
         if ( typeof type === 'string' ) type = [ type ];
 
-        type.forEach(function( t ) { !~types.indexOf( t ) && types.push( t ); });
+        type.forEach(function( t ) { if ( !~types.indexOf( t ) ) types.push( t ); });
       });
     }
 
@@ -202,13 +200,50 @@ module.exports = function( grunt ) {
         filename = ( ext ? id.replace( ext, '' ) : id );
       }
 
-      var filepath = path.join( dest, filename + '.jsonld' ).toLowerCase();
+      var filepath = path.join( dest, filename + '.json' ).toLowerCase();
 
       grunt.file.mkdir( path.dirname( filepath ) );
       grunt.file.write( filepath, JSON.stringify( jsonld, null, '\t' ) );
 
       return jsonld;
     };
+  };
+
+  exports.generateFrame = function( frame, context, datasets, type ) {
+    return new Promise(function( resolve, reject ) {
+      if ( frame ) return resolve( frame );
+
+      frame = {};
+      datasets.forEach(function( dataset ) {
+        dataset.forEach(function( x ) {
+          exports.detectCollections( x, frame );
+        });
+      });
+
+      return LDParser.compact( frame, context )
+        .then(function( context ) {
+          var frame = { '@context': context };
+
+          for ( var prop in context['@context'] ) {
+            frame['@context'][ prop ] = context['@context'][ prop ];
+          }
+          delete context['@context'];
+
+          frame[ '@type' ] = ( type || exports.getTypeFromGraph( datasets.length && datasets[0] ) || 'owl:Thing' );
+
+          return resolve( frame );
+        });
+    });
+  };
+
+  exports.detectCollections = function( entity, frame ) {
+    for ( var prop in entity ) {
+      if ( prop.indexOf('@') === 0 ) continue;
+
+      if ( entity.hasOwnProperty( prop ) && util.isArray( entity[ prop ] ) ) {
+        frame[ prop ] = { '@container': '@set' };
+      }
+    }
   };
 
   return exports;

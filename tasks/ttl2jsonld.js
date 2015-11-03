@@ -12,9 +12,7 @@ module.exports = function( grunt ) {
   var ttl2jsonld = require( './lib/ttl2jsonld' )( grunt );
 
   grunt.registerMultiTask('ttl2jsonld', 'Store JSON-LD framed graph output from SPARQL queries.', function() {
-    ttl2jsonld.options = this.options({
-      lang: 'en'
-    });
+    ttl2jsonld.options = this.options({});
 
     // check options to ensure they are suitable
 /*
