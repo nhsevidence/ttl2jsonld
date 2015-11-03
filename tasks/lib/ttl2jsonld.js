@@ -240,7 +240,7 @@ module.exports = function( grunt ) {
     for ( var prop in entity ) {
       if ( prop.indexOf('@') === 0 ) continue;
 
-      if ( entity.hasOwnProperty( prop ) && util.isArray( entity[ prop ] ) ) {
+      if ( entity.hasOwnProperty( prop ) && util.isArray( entity[ prop ] ) && entity[ prop ].length > 1 ) {
         frame[ prop ] = { '@container': '@set' };
       }
     }
