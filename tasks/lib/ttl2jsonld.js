@@ -115,36 +115,34 @@ module.exports = function( grunt ) {
     var isGraph = !graph.bindings;
 
     graph = graph.bindings || graph;
-    return LDParser.compact( graph, context )
-      .then(function( graph ) {
 
-        if ( !frame ) {
-          frame = { '@type': type || exports.getTypesFromGraph( graph ) || 'owl:Thing' };
-          grunt.verbose.writeln( 'Using generated frame...' );
-          grunt.verbose.writeln( JSON.stringify( frame ) );
-        }
-        frame[ '@context' ] = frame[ '@context' ] || context;
+    if ( !frame ) {
+      frame = { '@type': type || exports.getTypeFromGraph( graph ) || 'owl:Thing' };
+      grunt.verbose.writeln( 'Using generated frame...' );
+      grunt.verbose.writeln( JSON.stringify( frame ) );
+    }
+    frame[ '@context' ] = frame[ '@context' ] || context;
 
-        if ( !isGraph ) return graph;
+    if ( !isGraph ) return graph;
 
-        return LDParser.frame( graph, frame )
-              .catch(function( e ){
-                grunt.log.error( e );
-                grunt.fail.fatal( JSON.stringify( frame, null, ' ' ) );
-              });
-      });
+    return LDParser.frame( graph, frame )
+          .catch(function( e ){
+            grunt.log.error( e );
+            grunt.fail.fatal( JSON.stringify( frame, null, ' ' ) );
+          });
   };
 
   // returns an extended default jsonld context with language and optional @vocab set
   exports.createContext = function( contexts, lang, vocab ) {
     var ctx = {
-      "@language": lang,
-      rdf: 'http://www.w3.org/1999/02/22-rdf-syntax-ns',
-      owl: 'http://www.w3.org/2002/07/owl#',
-      xsd: 'http://www.w3.org/2001/XMLSchema#',
+       rdf: 'http://www.w3.org/1999/02/22-rdf-syntax-ns',
+       dct: 'http://purl.org/dc/terms/',
+       owl: 'http://www.w3.org/2002/07/owl#',
+       xsd: 'http://www.w3.org/2001/XMLSchema#',
       rdfs: 'http://www.w3.org/2000/01/rdf-schema#'
     };
 
+    if ( lang ) ctx['@language'] = lang;
     if ( vocab ) ctx['@vocab'] = vocab;
 
     for ( var c in contexts ) ctx[ c ] = contexts[ c ];
@@ -153,7 +151,7 @@ module.exports = function( grunt ) {
   };
 
   // inspects a jsonld graph for types
-  exports.getTypesFromGraph = function( graph ) {
+  exports.getTypeFromGraph = function( graph ) {
     var types = [];
 
     if ( graph['@graph'] ) {

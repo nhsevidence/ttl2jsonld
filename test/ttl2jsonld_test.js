@@ -87,7 +87,7 @@ exports.ttl2jsonld = {
 
   empty_types: function(test) {
     test.expect(1);
-    var actual = ttl2jsonld.getTypesFromGraph( {} );
+    var actual = ttl2jsonld.getTypeFromGraph( {} );
     var expected = 'owl:Thing';
 
     test.equal(actual, expected, 'should describe what happens by default.');
@@ -97,7 +97,7 @@ exports.ttl2jsonld = {
 
   empty_graph: function(test) {
     test.expect(1);
-    var actual = ttl2jsonld.getTypesFromGraph( { '@graph': [] } );
+    var actual = ttl2jsonld.getTypeFromGraph( { '@graph': [] } );
     var expected = 'owl:Thing';
 
     test.equal(actual, expected, 'should describe what happens by default.');
@@ -107,7 +107,7 @@ exports.ttl2jsonld = {
 
   single_typed_graph: function(test) {
     test.expect(1);
-    var actual = ttl2jsonld.getTypesFromGraph( { '@graph': [ { '@type': 'foo' } ] } );
+    var actual = ttl2jsonld.getTypeFromGraph( { '@graph': [ { '@type': 'foo' } ] } );
     var expected = 'foo';
 
     test.equal(actual, expected, 'should return the set single type.');
@@ -117,7 +117,7 @@ exports.ttl2jsonld = {
 
   multiple_typed_graphs: function(test) {
     test.expect(3);
-    var actual = ttl2jsonld.getTypesFromGraph( { '@graph': [ { '@type': 'foo' }, { '@type': 'bar' } ] } );
+    var actual = ttl2jsonld.getTypeFromGraph( { '@graph': [ { '@type': 'foo' }, { '@type': 'bar' } ] } );
     var expected = [ 'foo', 'bar' ];
 
     test.equal(actual[0], expected[0], 'should describe first result.');
@@ -129,7 +129,7 @@ exports.ttl2jsonld = {
 
   multi_typed_graph: function(test) {
     test.expect(3);
-    var actual = ttl2jsonld.getTypesFromGraph( { '@graph': [ { '@type': [ 'foo', 'bar' ] } ] } );
+    var actual = ttl2jsonld.getTypeFromGraph( { '@graph': [ { '@type': [ 'foo', 'bar' ] } ] } );
     var expected = [ 'foo', 'bar' ];
 
     test.equal(actual[0], expected[0], 'should describe first result.');
@@ -141,7 +141,7 @@ exports.ttl2jsonld = {
 
   single_and_multi_typed_graphs: function(test) {
     test.expect(4);
-    var actual = ttl2jsonld.getTypesFromGraph( { '@graph': [ { '@type': [ 'foo', 'bar' ] }, { '@type': [ 'baz' ] } ] } );
+    var actual = ttl2jsonld.getTypeFromGraph( { '@graph': [ { '@type': [ 'foo', 'bar' ] }, { '@type': [ 'baz' ] } ] } );
     var expected = [ 'foo', 'bar', 'baz' ];
 
     test.equal(actual[0], expected[0], 'should describe first result.');
@@ -154,7 +154,7 @@ exports.ttl2jsonld = {
 
   multiple_multi_typed_graphs: function(test) {
     test.expect(5);
-    var actual = ttl2jsonld.getTypesFromGraph( { '@graph': [ { '@type': [ 'foo', 'bar' ] }, { '@type': [ 'baz', 'boo' ] } ] } );
+    var actual = ttl2jsonld.getTypeFromGraph( { '@graph': [ { '@type': [ 'foo', 'bar' ] }, { '@type': [ 'baz', 'boo' ] } ] } );
     var expected = [ 'foo', 'bar', 'baz', 'boo' ];
 
     test.equal(actual[0], expected[0], 'should describe first result.');
