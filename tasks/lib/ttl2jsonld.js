@@ -6,6 +6,7 @@
  * Licensed under the MIT license.
  */
 
+(function( module ){
 'use strict';
 
 var IRI = require('iri').IRI;
@@ -222,7 +223,10 @@ module.exports = function( grunt ) {
 
       return LDParser.compact( frame, context )
         .then(function( context ) {
-          var frame = { '@context': context };
+          var frame = {
+            '@context': context,
+            '@embed': '@always'
+          };
 
           for ( var prop in context['@context'] ) {
             frame['@context'][ prop ] = context['@context'][ prop ];
@@ -248,3 +252,4 @@ module.exports = function( grunt ) {
 
   return exports;
 };
+})( module );
