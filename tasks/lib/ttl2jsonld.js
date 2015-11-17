@@ -60,7 +60,7 @@ module.exports = function( grunt ) {
                 flattened.bindings = flattened.bindings.concat( dataset.bindings );
               });
 
-              if ( ~graphs.length ) {
+              if ( graphs.length ) {
                 return RSVP.all( graphs ).then( resolve, reject );
               }
 
@@ -177,7 +177,11 @@ module.exports = function( grunt ) {
 
     return function( resources ) {
       return new Promise(function( resolve, reject ) {
-        resolve( resources.map( store ) );
+        if ( resources.bindings ) {
+          return resolve( store( resources.bindings ) );
+        }
+
+        return resolve( resources.map( store ) );
       });
     };
   };
@@ -215,11 +219,13 @@ module.exports = function( grunt ) {
       if ( frame ) return resolve( frame );
 
       frame = {};
-      datasets.forEach(function( dataset ) {
-        dataset.forEach(function( x ) {
-          exports.detectCollections( x, frame );
+      if ( datasets.length > 1 ) {
+        datasets.forEach(function( dataset ) {
+          dataset.forEach(function( x ) {
+            exports.detectCollections( x, frame );
+          });
         });
-      });
+      }
 
       return LDParser.compact( frame, context )
         .then(function( context ) {
