@@ -216,29 +216,19 @@ module.exports = function( grunt ) {
 
   exports.generateFrame = function( frame, context, datasets, type ) {
     return new Promise(function( resolve, reject ) {
-      if ( frame ) return resolve( frame );
+      if ( !frame ) frame = {};
 
-      frame = {};
-      if ( datasets.length > 1 ) {
+      if ( !context && datasets.length > 1 ) {
+        context = {};
         datasets.forEach(function( dataset ) {
           dataset.forEach(function( x ) {
-            exports.detectCollections( x, frame );
+            exports.detectCollections( x, context );
           });
         });
       }
 
       return LDParser.compact( frame, context )
-        .then(function( context ) {
-          var frame = {
-            '@context': context,
-            '@embed': '@always'
-          };
-
-          for ( var prop in context['@context'] ) {
-            frame['@context'][ prop ] = context['@context'][ prop ];
-          }
-          delete context['@context'];
-
+        .then(function( frame ) {
           frame[ '@type' ] = ( type || exports.getTypeFromGraph( datasets.length && datasets[0] ) || 'owl:Thing' );
 
           return resolve( frame );
