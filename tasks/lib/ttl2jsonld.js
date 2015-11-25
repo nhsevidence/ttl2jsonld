@@ -229,7 +229,8 @@ module.exports = function( grunt ) {
 
       return LDParser.compact( frame, context )
         .then(function( frame ) {
-          frame[ '@type' ] = ( type || exports.getTypeFromGraph( datasets.length && datasets[0] ) || 'owl:Thing' );
+          frame[ '@embed' ] = '@always';
+          if ( !frame['@type'] && !frame['@id'] )frame[ '@type' ] = ( type || exports.getTypeFromGraph( datasets.length && datasets[0] ) || 'owl:Thing' );
 
           return resolve( frame );
         });
