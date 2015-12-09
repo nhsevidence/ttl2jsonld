@@ -13,7 +13,7 @@ var IRI = require('iri').IRI;
 var jsonld = require('jsonld');
 var LDParser = jsonld.promises;
 var path = require('path');
-var Stardog = require('stardog');
+var Stardog = require('./stardog-sync');
 var RSVP = require('rsvp');
 var Promise = RSVP.Promise;
 var util = require('util');
@@ -25,8 +25,6 @@ module.exports = function( grunt ) {
   };
 
   exports.query = function( done ) {
-    // clone the list of queries
-    var queries = exports.options.queries && exports.options.queries.map ? exports.options.queries.map(function( q ) { return q; }) : exports.options.queries;
     var context = exports.createContext( exports.options.context, exports.options.lang, exports.options.vocab );
     var type    = exports.options.type;
     var frame   = exports.options.frame;
@@ -37,52 +35,55 @@ module.exports = function( grunt ) {
         stardog.setReasoning( exports.options.reasoning || false );
     var db      = exports.options.db;
 
-    process().then( exports.storeGraphs( exports.options.dest, exports.options.filename ) ).then(function() { done(); }).catch( grunt.fail.fatal );
+    var index = exports.options.index || " SELECT ?entity WHERE { ?entity a nicebnf:"+ type +" } "; //" VALUES ?entity { <http://bnf.nice.org.uk/drug/SUPERDRUG2> }";
+    var model = exports.options.model;
+    if ( model ) {
+      return processIndexQuery( index )
+                    .then( processModelQuery( model ) )
+                    .then(function() { done(); })
+                    .catch( grunt.fail.fatal );
+    }
 
-    function process( datasets ) {
-      var query = queries.shift();
+    return processIndexQuery( index )
+                  .then( prepareForSaving )
+                  .then( exports.storeGraph( exports.options.dest, exports.options.filename ) )
+                  .then(function() { done(); })
+                  .catch( grunt.fail.fatal );
 
-      if ( !query ) {
-        return new Promise(function( resolve, reject ) {
-          if ( !datasets ) {
-            return resolve( [] );
-          }
+    function processIndexQuery( query ) {
+      return exports.queryStardog( stardog, db, query );
+    }
 
-          exports.generateFrame( frame, context, datasets, type )
-            .then(function( frame ) {
-              var graphs = [];
-              var flattened = { bindings: [] };
-              datasets.forEach(function( dataset ) {
-                if ( !dataset.bindings ) {
-                  graphs.push( exports.frameGraph( dataset, context, frame ) );
-                }
+    function processModelQuery( query ) {
+      return function( dataset ) {
+        if ( !dataset.bindings ) return;
 
-                flattened.bindings = flattened.bindings.concat( dataset.bindings );
-              });
+        return RSVP.all( dataset.bindings.map( runModelQuery ) );
 
-              if ( graphs.length ) {
-                return RSVP.all( graphs ).then( resolve, reject );
-              }
+        function runModelQuery( recordset ) {
+          return new Promise(function( resolve, reject ) {
+            var modelQuery = exports.buildQueryFromRecordset( query, recordset );
 
-              resolve( flattened );
-            });
-        });
-      }
-
-      var promises = [];
-      if ( !datasets ) {
-        promises.push( exports.queryStardog( stardog, db, query ) );
-      } else {
-        datasets.forEach(function( dataset ) {
-          if ( !dataset.bindings ) return;
-
-          dataset.bindings.map(function( recordset ) {
-            promises.push( exports.queryStardog( stardog, db, exports.buildQueryFromRecordset( query, recordset ) ) );
+            exports.queryStardog( stardog, db, modelQuery )
+                   .then( prepareForSaving )
+                   .then( exports.storeGraph( exports.options.dest, exports.options.filename ) )
+                   .then( resolve, reject );
           });
-        });
+        }
       }
+    }
 
-      return RSVP.all( promises ).then( process ).catch( grunt.log.error );
+    function prepareForSaving( dataset ) {
+      if ( !dataset ) return [];
+
+      if ( dataset.bindings ) return dataset.bindings;
+
+      return exports.generateFrame( frame, context, [ dataset ], type )
+                    .then( withFrame );
+
+      function withFrame( frame ) {
+        return exports.frameGraph( dataset, context, frame );
+      }
     }
   };
 
@@ -102,7 +103,11 @@ module.exports = function( grunt ) {
     return new Promise(function( resolve, reject ) {
       stardog[ qType ]({ database: db, query: query }, onComplete );
 
-      function onComplete( data, response ) {
+      function onComplete( data, response, e ) {
+        if ( !response ) {
+          throw data;
+        }
+
         if ( response.statusCode < 200 || response.statusCode > 299 ) {
           var err = new Error( response.statusMessage + ' caused by the following SPARQL query [ ' + query + ' ]' );
           err.statusCode = response.statusCode;
