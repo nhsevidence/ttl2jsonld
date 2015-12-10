@@ -13,7 +13,7 @@ var IRI = require('iri').IRI;
 var jsonld = require('jsonld');
 var LDParser = jsonld.promises;
 var path = require('path');
-var Stardog = require('stardog');
+var Stardog = require('./stardog-sync');
 var RSVP = require('rsvp');
 var Promise = RSVP.Promise;
 var util = require('util');
@@ -35,7 +35,7 @@ module.exports = function( grunt ) {
         stardog.setReasoning( exports.options.reasoning || false );
     var db      = exports.options.db;
 
-    var index = exports.options.index || " SELECT ?entity WHERE { ?entity a nicebnf:"+ type +" } "; //" VALUES ?entity { <http://bnf.nice.org.uk/drug/SUPERDRUG2> }";
+    var index = exports.options.index || " SELECT ?entity WHERE { ?entity a "+ type +" } ";
     var model = exports.options.model;
     if ( model ) {
       return processIndexQuery( index )
@@ -70,7 +70,7 @@ module.exports = function( grunt ) {
                    .then( resolve, reject );
           });
         }
-      }
+      };
     }
 
     function prepareForSaving( dataset ) {
