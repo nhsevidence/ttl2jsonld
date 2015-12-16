@@ -17,6 +17,10 @@ var Stardog = require('./stardog-sync');
 var RSVP = require('rsvp');
 var Promise = RSVP.Promise;
 var util = require('util');
+var N3 = require('n3');
+
+// Utils for dealing with IRIs
+var N3Util = N3.Util;
 
 module.exports = function( grunt ) {
 
@@ -27,6 +31,7 @@ module.exports = function( grunt ) {
   exports.query = function( done ) {
     var context = exports.createContext( exports.options.context, exports.options.lang, exports.options.vocab );
     var type    = exports.options.type;
+    if ( type ) type = N3Util.expandPrefixedName( type, context );
     var frame   = exports.options.frame;
 
     var stardog = new Stardog.Connection();
@@ -35,7 +40,7 @@ module.exports = function( grunt ) {
         stardog.setReasoning( exports.options.reasoning || false );
     var db      = exports.options.db;
 
-    var index = exports.options.index || " SELECT ?entity WHERE { ?entity a "+ type +" } ";
+    var index = exports.options.index || " SELECT ?entity WHERE { ?entity a <"+ type +"> } ";
     var model = exports.options.model;
     if ( model ) {
       return processIndexQuery( index )

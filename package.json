@@ -1,7 +1,7 @@
 {
   "name": "ttl2jsonld",
   "description": "Extracts JSON-LD from a triple store",
-  "version": "0.0.23",
+  "version": "0.0.24",
   "author": "Matt Smith <mattonfoot@gmail.com> (http://about.me/mattonfoot)",
   "repository": "nhsevidence/ttl2jsonld",
   "license": "MIT",
@@ -14,6 +14,7 @@
   "dependencies": {
     "iri": "^1.1.1",
     "jsonld": "^0.4.1",
+    "n3": "^0.4.5",
     "rsvp": "^3.1.0",
     "stardog": "^0.3.0"
   },
