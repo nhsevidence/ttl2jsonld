@@ -13,7 +13,6 @@ var IRI = require('iri').IRI;
 var jsonld = require('jsonld');
 var LDParser = jsonld.promises;
 var path = require('path');
-var Stardog = require('./stardog-sync');
 var RSVP = require('rsvp');
 var Promise = RSVP.Promise;
 var util = require('util');
@@ -34,6 +33,7 @@ module.exports = function( grunt ) {
     if ( type ) type = N3Util.expandPrefixedName( type, context );
     var frame   = exports.options.frame;
 
+    var Stardog = require( exports.options.sync ? './stardog-sync' : 'stardog' );
     var stardog = new Stardog.Connection();
         stardog.setEndpoint( exports.options.server );
         stardog.setCredentials( exports.options.username, exports.options.password );
