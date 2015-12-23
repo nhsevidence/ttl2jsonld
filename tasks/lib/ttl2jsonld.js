@@ -207,9 +207,10 @@ module.exports = function( grunt ) {
       if ( !filename ) {
         var graph = ( jsonld[ '@graph' ] && jsonld[ '@graph' ][ 0 ] ) || jsonld;
 
-        var iri = new IRI( jsonld[ '@graph' ].length == 1 ? graph[ '@id' ] : 'index' );
-        var id = iri.fragment();
-            id = path.basename( id ? id.replace( '#', '' ) : iri.toIRIString() );
+        var id = jsonld[ '@graph' ].length == 1 ? N3Util.expandPrefixedName( graph[ '@id' ], jsonld[ '@context' ] ) : 'index';
+        var iri = new IRI( id );
+        id = iri.fragment();
+        id = path.basename( id ? id.replace( '#', '' ) : iri.toIRIString() );
 
         var ext = path.extname( id );
         filename = ( ext ? id.replace( ext, '' ) : id );
