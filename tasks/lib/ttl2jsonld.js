@@ -50,7 +50,7 @@ module.exports = function( grunt ) {
     }
 
     return processIndexQuery( index )
-                  .then( prepareForSaving )
+                  .then( prepareForSaving() )
                   .then( exports.storeGraph( exports.options.dest, exports.options.filename ) )
                   .then(function() { done(); })
                   .catch( grunt.fail.fatal );
@@ -70,7 +70,7 @@ module.exports = function( grunt ) {
             var modelQuery = exports.buildQueryFromRecordset( query, recordset );
 
             exports.queryStardog( stardog, db, modelQuery )
-                   .then( prepareForSaving )
+                   .then( prepareForSaving( recordset ) )
                    .then( exports.storeGraph( exports.options.dest, exports.options.filename ) )
                    .then( resolve, reject );
           });
@@ -78,18 +78,16 @@ module.exports = function( grunt ) {
       };
     }
 
-    function prepareForSaving( dataset ) {
-      if ( !dataset ) return [];
+    function prepareForSaving( recordset ) {
+      if ( recordset ) var frame = exports.buildFrameFromRecordset( frame, recordset );
 
-      if ( dataset.bindings ) return dataset.bindings;
+      return ( dataset ) => {
+        if ( !dataset ) return [];
+        if ( dataset.bindings ) return dataset.bindings;
 
-      return exports.generateFrame( frame, context, [ dataset ], type )
-                    .then( withFrame );
-
-      function withFrame( frame ) {
-        return exports.frameGraph( dataset, context, frame );
-      }
-    }
+        return exports.generateFrame( frame, context, [ dataset ], type ).then( exports.frameGraph( dataset, context ) );
+      };
+    };
   };
 
   exports.buildQueryFromRecordset = function( query, rs ) {
@@ -100,6 +98,16 @@ module.exports = function( grunt ) {
     }
 
     return query;
+  };
+
+  exports.buildFrameFromRecordset = function( frame, rs ) {
+    frame = frame || {};
+
+    if ( rs.entity ) {
+      frame['@id'] = rs.entity.value;
+    }
+
+    return frame;
   };
 
   exports.queryStardog = function( stardog, db, query ) {
@@ -126,19 +134,22 @@ module.exports = function( grunt ) {
     });
   };
 
-  exports.frameGraph = function( graph, context, frame ) {
+  exports.frameGraph = function( graph, context ) {
     var isGraph = !graph.bindings;
 
     graph = graph.bindings || graph;
-    if ( !isGraph ) return graph;
 
-    graph = { '@graph': graph };
+    return ( frame ) => {
+      if ( !isGraph ) return graph;
 
-    return LDParser.frame( graph, frame )
-          .catch(function( e ){
-            grunt.log.error( e );
-            grunt.fail.fatal( JSON.stringify( frame, null, ' ' ) );
-          });
+      graph = { '@graph': graph };
+
+      return LDParser.frame( graph, frame )
+            .catch(( e ) => {
+              grunt.log.error( e );
+              grunt.fail.fatal( JSON.stringify( frame, null, ' ' ) );
+            });
+    };
   };
 
   // returns an extended default jsonld context with language and optional @vocab set
@@ -238,13 +249,14 @@ module.exports = function( grunt ) {
         });
       }
 
-      return LDParser.compact( frame, context )
-        .then(function( frame ) {
-          frame[ '@embed' ] = '@always';
-          if ( !frame['@type'] && !frame['@id'] )frame[ '@type' ] = ( type || exports.getTypeFromGraph( datasets.length && datasets[0] ) || 'owl:Thing' );
+      frame[ '@embed' ] = '@always';
+      frame[ '@context' ] = context;
 
-          return resolve( frame );
-        });
+      if ( !frame['@type'] && !frame['@id'] ) frame[ '@type' ] = ( type || exports.getTypeFromGraph( datasets.length && datasets[0] ) || 'owl:Thing' );
+
+      console.log( frame );
+
+      return resolve( frame );
     });
   };
 
