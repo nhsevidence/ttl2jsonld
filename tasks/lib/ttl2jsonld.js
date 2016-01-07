@@ -87,7 +87,7 @@ module.exports = function( grunt ) {
 
         return exports.generateFrame( frame, context, [ dataset ], type ).then( exports.frameGraph( dataset, context ) );
       };
-    };
+    }
   };
 
   exports.buildQueryFromRecordset = function( query, rs ) {
@@ -253,8 +253,6 @@ module.exports = function( grunt ) {
       frame[ '@context' ] = context;
 
       if ( !frame['@type'] && !frame['@id'] ) frame[ '@type' ] = ( type || exports.getTypeFromGraph( datasets.length && datasets[0] ) || 'owl:Thing' );
-
-      console.log( frame );
 
       return resolve( frame );
     });
