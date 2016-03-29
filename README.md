@@ -102,4 +102,4 @@ ttl2jsonld: {
 
 ###### Options
 
-Options can be specified for all `jsonld2html` tasks and for each `jsonld2html:target` just like in other Grunt tasks.
+Options can be specified for all `ttl2jsonld` tasks and for each `ttl2jsonld:target` just like in other Grunt tasks.
